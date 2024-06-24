@@ -2,6 +2,11 @@
 name = "combiner"
 version = "0.1.0"
 edition = "2021"
+authors = ["jesalpatelx@gmail.com"]
+description = "A tool for recursively combining text files in a directory"
+license = "MIT"
+repository = "https://github.com/Jesalx/combiner"
+categories = ["command-line-utilities"]
 
 [dependencies]
 structopt = "0.3"
@@ -13,3 +18,7 @@ chrono = "0.4"
 tiktoken-rs = "0.5"
 prettytable-rs = "0.10"
 rayon = "1.10"
+
+[[bin]]
+name = "combiner"
+path = "src/main.rs"
