@@ -19,7 +19,6 @@ pub fn print_table(
     table.add_row(row!["Processing Time", format!("{:.2?}", processing_time)]);
     table.printstd();
 
-    println!("\nTop {} Files by Token Count:", TOP_FILES_TO_SHOW);
     let mut details_table = Table::new();
     details_table.add_row(row!["File", "Tokens", "Size (bytes)"]);
 
@@ -29,6 +28,7 @@ pub fn print_table(
     for (file, tokens, size) in sorted_stats.iter().take(TOP_FILES_TO_SHOW) {
         details_table.add_row(row![file, tokens, size]);
     }
+    println!("\nTop {} Files by Token Count:", details_table.len());
     details_table.printstd();
 }
 
