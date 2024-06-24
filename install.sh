@@ -25,7 +25,7 @@ fi
 sudo mkdir -p /usr/local/bin
 
 # Copy the binary to /usr/local/bin
-echo "Installing file-combiner..."
+echo "Installing combiner..."
 sudo cp target/release/combiner /usr/local/bin/
 
 if [ $? -ne 0 ]; then
@@ -38,3 +38,4 @@ sudo chmod +x /usr/local/bin/combiner
 
 echo -e "${GREEN}combiner has been successfully installed!${NC}"
 echo "You can now use it by running 'combiner' from anywhere in your terminal."
+combiner --help
