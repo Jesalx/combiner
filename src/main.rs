@@ -43,6 +43,11 @@ fn main() -> Result<()> {
 
     let processing_time = start_time.elapsed();
 
+    // Calculate files failed and ignored
+    let files_failed = skipped_files.len();
+    let total_files = files_processed + files_failed + ignore_patterns.len();
+    let files_ignored = total_files - files_processed - files_failed;
+
     // Print results
     print_table(
         files_processed,
@@ -50,12 +55,16 @@ fn main() -> Result<()> {
         &output_file,
         &file_stats,
         processing_time,
+        config
+            .tokenization_method
+            .as_ref()
+            .unwrap_or(&opt.tokenization_method),
+        files_failed,
+        files_ignored,
     );
 
     // Print skipped files
-    if !skipped_files.is_empty() {
-        print_skipped_files(&skipped_files);
-    }
+    print_skipped_files(&skipped_files);
 
     Ok(())
 }
