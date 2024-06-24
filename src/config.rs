@@ -1,5 +1,5 @@
 use anyhow::{Context, Result};
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 use std::fs;
 use std::path::{Path, PathBuf};
 use structopt::StructOpt;
@@ -28,6 +28,71 @@ pub struct Opt {
     /// Enable verbose output
     #[structopt(short, long)]
     pub verbose: bool,
+
+    /// Tokenization method
+    #[structopt(
+        long,
+        parse(try_from_str = parse_tokenization_method),
+        possible_values = &TokenizationMethod::variants(),
+        case_insensitive = true,
+        default_value = "code"
+    )]
+    pub tokenization_method: TokenizationMethod,
+}
+
+#[derive(Debug, Deserialize, Serialize, Clone, PartialEq)]
+#[serde(rename_all = "lowercase")]
+pub enum TokenizationMethod {
+    #[serde(alias = "gpt4o")]
+    O200kBase,
+    #[serde(alias = "gpt4")]
+    Cl100kBase,
+    #[serde(alias = "code")]
+    P50kBase,
+    P50kEdit,
+    #[serde(alias = "gpt2")]
+    R50kBase,
+}
+
+impl TokenizationMethod {
+    pub fn variants() -> [&'static str; 9] {
+        [
+            "gpt4o",
+            "o200k_base",
+            "gpt4",
+            "cl100k_base",
+            "code",
+            "p50k_base",
+            "p50k_edit",
+            "gpt2",
+            "r50k_base",
+        ]
+    }
+
+    pub fn from_str(s: &str) -> Result<Self, String> {
+        match s.to_lowercase().as_str() {
+            "gpt4o" | "o200k_base" => Ok(TokenizationMethod::O200kBase),
+            "gpt4" | "cl100k_base" => Ok(TokenizationMethod::Cl100kBase),
+            "code" | "p50k_base" => Ok(TokenizationMethod::P50kBase),
+            "p50k_edit" => Ok(TokenizationMethod::P50kEdit),
+            "gpt2" | "r50k_base" => Ok(TokenizationMethod::R50kBase),
+            _ => Err(format!("Invalid tokenization method: {}", s)),
+        }
+    }
+
+    pub fn to_string(&self) -> String {
+        match self {
+            TokenizationMethod::O200kBase => "gpt4o".to_string(),
+            TokenizationMethod::Cl100kBase => "gpt4".to_string(),
+            TokenizationMethod::P50kBase => "code".to_string(),
+            TokenizationMethod::P50kEdit => "p50k_edit".to_string(),
+            TokenizationMethod::R50kBase => "gpt2".to_string(),
+        }
+    }
+}
+
+fn parse_tokenization_method(s: &str) -> Result<TokenizationMethod, String> {
+    TokenizationMethod::from_str(s)
 }
 
 #[derive(Debug, Deserialize)]
@@ -35,6 +100,7 @@ pub struct Config {
     pub ignore_patterns: Option<Vec<String>>,
     pub include_patterns: Option<Vec<String>>,
     pub output_file: Option<String>,
+    pub tokenization_method: Option<TokenizationMethod>,
 }
 
 pub fn load_config(opt: &mut Opt) -> Result<Config> {
@@ -49,12 +115,20 @@ pub fn load_config(opt: &mut Opt) -> Result<Config> {
         Some(path) => {
             let config_str = fs::read_to_string(path)
                 .with_context(|| format!("Failed to read config file: {:?}", path))?;
-            Ok(toml::from_str(&config_str)?)
+            let mut config: Config = toml::from_str(&config_str)?;
+
+            // If tokenization_method is not specified in the config file, use the CLI option
+            if config.tokenization_method.is_none() {
+                config.tokenization_method = Some(opt.tokenization_method.clone());
+            }
+
+            Ok(config)
         }
         None => Ok(Config {
             ignore_patterns: None,
             include_patterns: None,
             output_file: None,
+            tokenization_method: Some(opt.tokenization_method.clone()),
         }),
     }
 }
@@ -95,6 +169,14 @@ pub fn print_verbose_info(
         println!("Output file: {:?}", output_file);
         println!("Config file: {:?}", opt.config_file);
         println!("Ignore patterns: {:?}", ignore_patterns);
+        println!(
+            "Tokenization method: {}",
+            config
+                .tokenization_method
+                .as_ref()
+                .unwrap_or(&opt.tokenization_method)
+                .to_string()
+        );
         if let Some(include_patterns) = &config.include_patterns {
             println!("Include patterns: {:?}", include_patterns);
         }

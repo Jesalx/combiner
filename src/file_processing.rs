@@ -4,10 +4,10 @@ use std::fs::{self, File};
 use std::io::{BufWriter, Write};
 use std::path::Path;
 use std::sync::{Arc, Mutex};
-use tiktoken_rs::p50k_base;
+use tiktoken_rs::{cl100k_base, o200k_base, p50k_base, p50k_edit, r50k_base, CoreBPE};
 use walkdir::WalkDir;
 
-use crate::config::Config;
+use crate::config::{Config, TokenizationMethod};
 
 pub fn process_files(
     opt: &crate::config::Opt,
@@ -21,7 +21,11 @@ pub fn process_files(
     Vec<(String, String)>,
 )> {
     let output = Arc::new(Mutex::new(BufWriter::new(File::create(output_file)?)));
-    let bpe = Arc::new(p50k_base()?);
+    let tokenization_method = config
+        .tokenization_method
+        .as_ref()
+        .unwrap_or(&opt.tokenization_method);
+    let bpe = Arc::new(get_tokenizer(tokenization_method)?);
 
     let file_stats = Arc::new(Mutex::new(Vec::new()));
     let skipped_files = Arc::new(Mutex::new(Vec::new()));
@@ -104,6 +108,16 @@ pub fn process_files(
     ))
 }
 
+fn get_tokenizer(method: &TokenizationMethod) -> Result<CoreBPE> {
+    match method {
+        TokenizationMethod::O200kBase => o200k_base(),
+        TokenizationMethod::Cl100kBase => cl100k_base(),
+        TokenizationMethod::P50kBase => p50k_base(),
+        TokenizationMethod::P50kEdit => p50k_edit(),
+        TokenizationMethod::R50kBase => r50k_base(),
+    }
+}
+
 fn is_text_file(path: &Path) -> bool {
     path.extension()
         .and_then(|ext| ext.to_str())
@@ -159,7 +173,7 @@ fn should_include(path: &Path, include_patterns: &Option<Vec<String>>) -> bool {
 fn process_file(
     path: &Path,
     output: &Arc<Mutex<BufWriter<File>>>,
-    bpe: &Arc<tiktoken_rs::CoreBPE>,
+    bpe: &Arc<CoreBPE>,
 ) -> Result<(usize, u64)> {
     let mut output = output.lock().unwrap();
     write!(output, "File: {:?}\n", path)?;
@@ -191,3 +205,4 @@ pub fn print_skip_reason(
         println!("Skipping non-included file: {:?}", path);
     }
 }
+
