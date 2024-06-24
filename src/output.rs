@@ -28,7 +28,7 @@ pub fn print_table(
     for (file, tokens, size) in sorted_stats.iter().take(TOP_FILES_TO_SHOW) {
         details_table.add_row(row![file, tokens, size]);
     }
-    println!("\nTop {} Files by Token Count:", details_table.len());
+    println!("\nTop {} Files by Token Count:", details_table.len() - 1);
     details_table.printstd();
 }
 
