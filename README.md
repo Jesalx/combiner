@@ -34,10 +34,10 @@ Combiner is a Rust-based command-line tool that processes text files in a given 
 
 3. The binary will be available at `target/release/combiner`
 
-Alternatively, you can use the provided `install.sh` script to build and install the binary:
+Alternatively, you can use install combiner using cargo:
 
 ```
-./install.sh
+cargo install combiner
 ```
 
 This will build the project and copy the binary to `/usr/local/bin/combiner`.
