@@ -1,8 +1,10 @@
-use anyhow::{Context, Result};
+use log::info;
 use serde::{Deserialize, Serialize};
 use std::fs;
 use std::path::{Path, PathBuf};
 use structopt::StructOpt;
+
+use crate::error::CombinerError;
 
 const DEFAULT_CONFIG_FILE: &str = "combiner.toml";
 
@@ -54,6 +56,12 @@ pub enum TokenizationMethod {
     R50kBase,
 }
 
+impl Default for TokenizationMethod {
+    fn default() -> Self {
+        TokenizationMethod::P50kBase
+    }
+}
+
 impl TokenizationMethod {
     pub fn variants() -> [&'static str; 9] {
         [
@@ -97,65 +105,71 @@ fn parse_tokenization_method(s: &str) -> Result<TokenizationMethod, String> {
 
 #[derive(Debug, Deserialize)]
 pub struct Config {
-    pub ignore_patterns: Option<Vec<String>>,
-    pub include_patterns: Option<Vec<String>>,
-    pub output_file: Option<String>,
-    pub tokenization_method: Option<TokenizationMethod>,
+    #[serde(default)]
+    pub ignore_patterns: Vec<String>,
+    #[serde(default)]
+    pub include_patterns: Vec<String>,
+    pub output_file: Option<PathBuf>,
+    #[serde(default)]
+    pub tokenization_method: TokenizationMethod,
 }
 
-pub fn load_config(opt: &mut Opt) -> Result<Config> {
-    if opt.config_file.is_none() {
-        let default_config = opt.input_dir.join(DEFAULT_CONFIG_FILE);
-        if default_config.exists() {
-            opt.config_file = Some(default_config);
-        }
-    }
-
-    match &opt.config_file {
-        Some(path) => {
-            let config_str = fs::read_to_string(path)
-                .with_context(|| format!("Failed to read config file: {:?}", path))?;
-            let mut config: Config = toml::from_str(&config_str)?;
-
-            // If tokenization_method is not specified in the config file, use the CLI option
-            if config.tokenization_method.is_none() {
-                config.tokenization_method = Some(opt.tokenization_method.clone());
-            }
-
-            Ok(config)
-        }
-        None => Ok(Config {
-            ignore_patterns: None,
-            include_patterns: None,
+impl Default for Config {
+    fn default() -> Self {
+        Config {
+            ignore_patterns: vec![],
+            include_patterns: vec![],
             output_file: None,
-            tokenization_method: Some(opt.tokenization_method.clone()),
-        }),
+            tokenization_method: TokenizationMethod::default(),
+        }
     }
 }
 
-pub fn merge_ignore_patterns(
-    cli_patterns: &[String],
-    config_patterns: &Option<Vec<String>>,
-) -> Vec<String> {
-    let mut patterns = cli_patterns.to_vec();
-    if let Some(config_patterns) = config_patterns {
-        patterns.extend(config_patterns.iter().cloned());
+pub fn load_config(opt: &Opt) -> Result<Config, CombinerError> {
+    let config_path = opt
+        .config_file
+        .clone()
+        .unwrap_or_else(|| opt.input_dir.join(DEFAULT_CONFIG_FILE));
+
+    if config_path.exists() {
+        let config_str = fs::read_to_string(&config_path)
+            .map_err(|e| CombinerError::Config(format!("Failed to read config file: {}", e)))?;
+        let mut config: Config = toml::from_str(&config_str)
+            .map_err(|e| CombinerError::Config(format!("Failed to parse config file: {}", e)))?;
+
+        // If tokenization_method is not specified in the config file, use the CLI option
+        if config.tokenization_method == TokenizationMethod::P50kBase {
+            config.tokenization_method = opt.tokenization_method.clone();
+        }
+
+        Ok(config)
+    } else {
+        Ok(Config {
+            tokenization_method: opt.tokenization_method.clone(),
+            ..Default::default()
+        })
     }
+}
+
+pub fn merge_ignore_patterns(cli_patterns: &[String], config_patterns: &[String]) -> Vec<String> {
+    let mut patterns = cli_patterns.to_vec();
+    patterns.extend(config_patterns.iter().cloned());
     patterns
 }
 
-pub fn determine_output_file(opt: &mut Opt, config: &Config) -> Result<PathBuf> {
-    if opt.output_file.is_none() {
-        opt.output_file = config.output_file.as_ref().map(PathBuf::from).or_else(|| {
+pub fn determine_output_file(opt: &Opt, config: &Config) -> Result<PathBuf, CombinerError> {
+    opt.output_file
+        .clone()
+        .or_else(|| config.output_file.clone())
+        .or_else(|| {
             let datetime = chrono::Local::now().format("%Y%m%d_%H%M%S");
             Some(PathBuf::from(format!(
                 "{}{}.txt",
                 crate::DEFAULT_OUTPUT_PREFIX,
                 datetime
             )))
-        });
-    }
-    Ok(opt.output_file.as_ref().unwrap().to_path_buf())
+        })
+        .ok_or_else(|| CombinerError::Config("No output file specified".to_string()))
 }
 
 pub fn print_verbose_info(
@@ -164,21 +178,14 @@ pub fn print_verbose_info(
     ignore_patterns: &[String],
     config: &Config,
 ) {
-    if opt.verbose {
-        println!("Input directory: {:?}", opt.input_dir);
-        println!("Output file: {:?}", output_file);
-        println!("Config file: {:?}", opt.config_file);
-        println!("Ignore patterns: {:?}", ignore_patterns);
-        println!(
-            "Tokenization method: {}",
-            config
-                .tokenization_method
-                .as_ref()
-                .unwrap_or(&opt.tokenization_method)
-                .to_string()
-        );
-        if let Some(include_patterns) = &config.include_patterns {
-            println!("Include patterns: {:?}", include_patterns);
-        }
-    }
+    info!("Input directory: {:?}", opt.input_dir);
+    info!("Output file: {:?}", output_file);
+    info!("Config file: {:?}", opt.config_file);
+    info!("Ignore patterns: {:?}", ignore_patterns);
+    info!(
+        "Tokenization method: {}",
+        config.tokenization_method.to_string()
+    );
+    info!("Include patterns: {:?}", config.include_patterns);
 }
+

@@ -18,6 +18,9 @@ chrono = "0.4"
 tiktoken-rs = "0.5"
 prettytable-rs = "0.10"
 rayon = "1.10"
+thiserror = "1.0"
+log = "0.4"
+env_logger = "0.11"
 
 [[bin]]
 name = "combiner"

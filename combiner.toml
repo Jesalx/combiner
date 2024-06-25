@@ -1,2 +1,2 @@
-ignore_patterns = ["LICENSE"]
+ignore_patterns = ["LICENSE", "sample"]
 output_file = "combined_output.txt"
