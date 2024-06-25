@@ -1,6 +1,6 @@
 [package]
 name = "combiner"
-version = "0.1.3"
+version = "0.1.4"
 edition = "2021"
 authors = ["jesalpatelx@gmail.com"]
 description = "A tool for recursively combining text files in a directory"
