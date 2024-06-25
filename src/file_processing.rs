@@ -1,3 +1,4 @@
+use glob::Pattern;
 use log::{info, warn};
 use rayon::prelude::*;
 use std::fs::{self, File};
@@ -85,7 +86,7 @@ fn get_tokenizer(method: &TokenizationMethod) -> Result<CoreBPE, CombinerError> 
     result.map_err(|e| CombinerError::Tokenization(e.to_string()))
 }
 
-fn is_text_file(path: &Path) -> bool {
+pub fn is_text_file(path: &Path) -> bool {
     path.extension()
         .and_then(|ext| ext.to_str())
         .map(|ext| {
@@ -116,20 +117,25 @@ fn is_text_file(path: &Path) -> bool {
         .unwrap_or(false)
 }
 
-fn should_ignore(path: &Path, ignore_patterns: &[String]) -> bool {
-    let file_name = path.file_name().and_then(|n| n.to_str()).unwrap_or("");
-
-    ignore_patterns
-        .iter()
-        .any(|pattern| path.to_str().map(|s| s.contains(pattern)).unwrap_or(false))
-        || file_name.starts_with(crate::DEFAULT_OUTPUT_PREFIX)
+pub fn should_ignore(path: &Path, ignore_patterns: &[String]) -> bool {
+    let path_str = path.to_string_lossy();
+    ignore_patterns.iter().any(|pattern| {
+        Pattern::new(pattern)
+            .map(|glob| glob.matches(&path_str))
+            .unwrap_or(false)
+    })
 }
 
-fn should_include(path: &Path, include_patterns: &[String]) -> bool {
-    include_patterns.is_empty()
-        || include_patterns
-            .iter()
-            .any(|pattern| path.to_str().map(|s| s.contains(pattern)).unwrap_or(false))
+pub fn should_include(path: &Path, include_patterns: &[String]) -> bool {
+    if include_patterns.is_empty() {
+        return true;
+    }
+    let path_str = path.to_string_lossy();
+    include_patterns.iter().any(|pattern| {
+        Pattern::new(pattern)
+            .map(|glob| glob.matches(&path_str))
+            .unwrap_or(false)
+    })
 }
 
 fn process_file(
@@ -156,3 +162,41 @@ fn process_file(
     Ok((tokens.len(), file_size))
 }
 
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::path::PathBuf;
+
+    #[test]
+    fn test_is_text_file() {
+        assert!(is_text_file(&PathBuf::from("test.txt")));
+        assert!(is_text_file(&PathBuf::from("test.rs")));
+        assert!(!is_text_file(&PathBuf::from("test.exe")));
+        assert!(!is_text_file(&PathBuf::from("test")));
+    }
+
+    #[test]
+    fn test_should_ignore() {
+        let ignore_patterns = vec![String::from("*.log"), String::from("temp/*")];
+        assert!(should_ignore(&PathBuf::from("test.log"), &ignore_patterns));
+        assert!(should_ignore(
+            &PathBuf::from("temp/file.txt"),
+            &ignore_patterns
+        ));
+        assert!(!should_ignore(&PathBuf::from("test.txt"), &ignore_patterns));
+    }
+
+    #[test]
+    fn test_should_include() {
+        let include_patterns = vec![String::from("*.rs"), String::from("src/*")];
+        assert!(should_include(&PathBuf::from("main.rs"), &include_patterns));
+        assert!(should_include(
+            &PathBuf::from("src/lib.rs"),
+            &include_patterns
+        ));
+        assert!(!should_include(
+            &PathBuf::from("test.txt"),
+            &include_patterns
+        ));
+    }
+}

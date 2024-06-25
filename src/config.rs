@@ -8,7 +8,7 @@ use crate::error::CombinerError;
 
 const DEFAULT_CONFIG_FILE: &str = "combiner.toml";
 
-#[derive(Debug, StructOpt)]
+#[derive(Debug, StructOpt, Default)]
 #[structopt(name = "combiner", about = "Combines text files in a directory")]
 pub struct Opt {
     /// Input directory to process
@@ -189,3 +189,52 @@ pub fn print_verbose_info(
     info!("Include patterns: {:?}", config.include_patterns);
 }
 
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::fs;
+    use tempfile::tempdir;
+
+    #[test]
+    fn test_load_config() {
+        let dir = tempdir().unwrap();
+        let config_path = dir.path().join("test_config.toml");
+        fs::write(
+            &config_path,
+            r#"
+            ignore_patterns = ["*.log", "*.tmp"]
+            include_patterns = ["*.rs", "*.toml"]
+            output_file = "test_output.txt"
+            tokenization_method = "gpt4"
+        "#,
+        )
+        .unwrap();
+
+        let opt = Opt {
+            config_file: Some(config_path),
+            tokenization_method: TokenizationMethod::P50kBase,
+            ..Default::default()
+        };
+
+        let config = load_config(&opt).unwrap();
+        assert_eq!(config.ignore_patterns, vec!["*.log", "*.tmp"]);
+        assert_eq!(config.include_patterns, vec!["*.rs", "*.toml"]);
+        assert_eq!(config.output_file, Some(PathBuf::from("test_output.txt")));
+        assert_eq!(config.tokenization_method, TokenizationMethod::Cl100kBase);
+    }
+
+    #[test]
+    fn test_merge_ignore_patterns() {
+        let cli_patterns = vec![String::from("*.bak")];
+        let config_patterns = vec![String::from("*.tmp"), String::from("*.log")];
+        let merged = merge_ignore_patterns(&cli_patterns, &config_patterns);
+        assert_eq!(
+            merged,
+            vec![
+                String::from("*.bak"),
+                String::from("*.tmp"),
+                String::from("*.log")
+            ]
+        );
+    }
+}
