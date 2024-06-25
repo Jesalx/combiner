@@ -18,51 +18,67 @@ pub fn print_table(
 ) {
     let mut table = Table::new();
     table.add_row(row!["Statistic", "Value"]);
+
+    // File statistics
     table.add_row(row!["Files Processed", files_processed]);
     table.add_row(row!["Files Failed", files_failed]);
     table.add_row(row!["Files Ignored", files_ignored]);
-    table.add_row(row!["Total Tokens", total_tokens]);
-    table.add_row(row!["Tokenization Method", tokenization_method.to_string()]);
-    table.add_row(row!["Output File", output_file.to_string_lossy()]);
-    table.add_row(row!["Processing Time", format!("{:.2?}", processing_time)]);
+    table.add_row(row![
+        "Total Files",
+        files_processed + files_failed + files_ignored
+    ]);
 
+    // Size statistics
     let total_size: u64 = file_stats.iter().map(|(_, _, size)| size).sum();
-    let avg_tokens = if files_processed > 0 {
-        total_tokens as f64 / files_processed as f64
-    } else {
-        0.0
-    };
+    table.add_row(row![
+        "Total File Size",
+        format!("{:.2} MB", total_size as f64 / 1_048_576.0)
+    ]);
+
     let avg_size = if files_processed > 0 {
         total_size as f64 / files_processed as f64
     } else {
         0.0
     };
-
-    table.add_row(row![
-        "Total File Size",
-        format!("{:.2} MB", total_size as f64 / 1_048_576.0)
-    ]);
-    table.add_row(row![
-        "Average Tokens per File",
-        format!("{:.2}", avg_tokens)
-    ]);
     table.add_row(row![
         "Average File Size",
         format!("{:.2} KB", avg_size / 1024.0)
     ]);
 
+    // Averages
+    let avg_tokens = if files_processed > 0 {
+        total_tokens as f64 / files_processed as f64
+    } else {
+        0.0
+    };
+
+    // Token statistics
+    table.add_row(row!["Total Tokens", total_tokens]);
+
+    table.add_row(row![
+        "Average Tokens per File",
+        format!("{:.2}", avg_tokens)
+    ]);
+
+    // Other information
+    table.add_row(row!["Tokenization Method", tokenization_method.to_string()]);
+    table.add_row(row!["Output File", output_file.to_string_lossy()]);
+    table.add_row(row!["Processing Time", format!("{:.2?}", processing_time)]);
+
     table.printstd();
 
+    // Top files table
+    println!("\nTop {} Files by Token Count:", TOP_FILES_TO_SHOW);
     let mut details_table = Table::new();
-    details_table.add_row(row!["File", "Tokens", "Size (bytes)"]);
+    details_table.add_row(row!["File", "Tokens", "Size (bytes)", "% of Total Tokens"]);
 
     // Sort file_stats by token count (descending) and take top N
     let mut sorted_stats = file_stats.to_vec();
     sorted_stats.sort_by(|a, b| b.1.cmp(&a.1));
     for (file, tokens, size) in sorted_stats.iter().take(TOP_FILES_TO_SHOW) {
-        details_table.add_row(row![file, tokens, size]);
+        let percentage = ((*tokens as f64 / total_tokens as f64) * 100.0).round();
+        details_table.add_row(row![file, tokens, size, format!("{:.0}%", percentage)]);
     }
-    println!("\nTop {} Files by Token Count:", TOP_FILES_TO_SHOW);
     details_table.printstd();
 }
 
@@ -79,4 +95,3 @@ pub fn print_skipped_files(skipped_files: &[(String, String)]) {
     }
     skipped_table.printstd();
 }
-
