@@ -40,8 +40,6 @@ Alternatively, you can use install combiner using cargo:
 cargo install combiner
 ```
 
-This will build the project and copy the binary to `/usr/local/bin/combiner`.
-
 ## Usage
 
 Basic usage:
