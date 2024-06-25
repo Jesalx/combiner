@@ -68,7 +68,6 @@ pub fn print_table(
     table.printstd();
 
     // Top files table
-    println!("\nTop {} Files by Token Count:", TOP_FILES_TO_SHOW);
     let mut details_table = Table::new();
     details_table.add_row(row!["File", "Tokens", "Size (bytes)", "% of Total Tokens"]);
 
@@ -79,6 +78,7 @@ pub fn print_table(
         let percentage = ((*tokens as f64 / total_tokens as f64) * 100.0).round();
         details_table.add_row(row![file, tokens, size, format!("{:.0}%", percentage)]);
     }
+    println!("\nTop {} Files by Token Count:", details_table.len() - 1);
     details_table.printstd();
 }
 
