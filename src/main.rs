@@ -29,6 +29,8 @@ fn main() -> Result<()> {
     // Add ".git" to the ignore list
     args.ignore.push(String::from(".git"));
 
+    let tokenizer = tokenization::Tokenizer::new(args.tokenization_method)?;
+
     let contents = load_directory_contents(&args.input_dir, args.ignore.clone())?;
     println!("Valid files: {}", contents.valid_files.len());
     println!("Invalid files: {}", contents.invalid_files.len());

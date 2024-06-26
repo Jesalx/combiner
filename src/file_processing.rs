@@ -1,11 +1,31 @@
 use anyhow::Result;
 use ignore::WalkBuilder;
 use std::path::{Path, PathBuf};
+use std::sync::OnceLock;
+
+use crate::tokenization::Tokenizer;
 
 #[derive(Debug)]
 pub struct FileContents {
     pub path: PathBuf,
     pub content: String,
+    token_count: OnceLock<usize>,
+}
+
+impl FileContents {
+    pub fn new(path: PathBuf, content: String) -> Self {
+        Self {
+            path,
+            content,
+            token_count: OnceLock::new(),
+        }
+    }
+
+    pub fn count_tokens(&self, tokenizer: &Tokenizer) -> usize {
+        self.token_count
+            .get_or_init(|| tokenizer.count_tokens(&self.content))
+            .clone()
+    }
 }
 
 #[derive(Debug)]
@@ -43,10 +63,7 @@ pub fn load_directory_contents(
         let path = entry.path();
         if path.is_file() {
             match std::fs::read_to_string(path) {
-                Ok(content) => valid_files.push(FileContents {
-                    path: path.to_path_buf(),
-                    content,
-                }),
+                Ok(content) => valid_files.push(FileContents::new(path.to_path_buf(), content)),
                 Err(e) => invalid_files.push(InvalidFile {
                     path: path.to_path_buf(),
                     reason: format!("Failed to read file: {}", e),
