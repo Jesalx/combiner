@@ -1,6 +1,9 @@
+mod file_processing;
 mod tokenization;
 
+use anyhow::Result;
 use clap::Parser;
+use file_processing::load_directory_contents;
 use std::path::PathBuf;
 use tokenization::TokenizationMethod;
 
@@ -20,8 +23,21 @@ struct Args {
     tokenization_method: TokenizationMethod,
 }
 
-fn main() {
-    let args = Args::parse();
+fn main() -> Result<()> {
+    let mut args = Args::parse();
 
-    println!("{:?}", args);
+    // Add ".git" to the ignore list
+    args.ignore.push(String::from(".git"));
+
+    let contents = load_directory_contents(&args.input_dir, args.ignore.clone())?;
+    println!("Valid files: {}", contents.valid_files.len());
+    println!("Invalid files: {}", contents.invalid_files.len());
+    for file in contents.valid_files {
+        println!("{}", file.content)
+    }
+    for file in contents.invalid_files {
+        println!("{}", file.path.display());
+    }
+
+    Ok(())
 }
