@@ -22,7 +22,7 @@ Combiner is a Rust-based command-line tool that processes text files in a given 
 1. Clone the repository:
 
    ```
-   git clone https://github.com/yourusername/combiner.git
+   git clone https://github.com/jesalx/combiner.git
    cd combiner
    ```
 
