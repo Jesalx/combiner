@@ -42,7 +42,7 @@ cargo install combiner
 Basic usage:
 
 ```
-combiner -d <input_directory> -o <output_file>
+combiner -d <directory> -o <output>
 ```
 
 For more options:
