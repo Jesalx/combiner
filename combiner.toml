@@ -1,2 +1,0 @@
-ignore_patterns = ["LICENSE"]
-output_file = "combined_output.txt"

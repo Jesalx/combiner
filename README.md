@@ -5,11 +5,8 @@ Combiner is a Rust-based command-line tool that processes text files in a given 
 ## Features
 
 - Recursively scans directories for text files
-- Configurable file inclusion/exclusion patterns
-- Parallel processing for improved performance
 - Token counting using the tiktoken-rs library
 - Detailed output statistics
-- Support for both command-line arguments and configuration files
 
 ## Installation
 
@@ -56,23 +53,8 @@ combiner --help
 
 ### Command-line Options
 
-- `-d, --input-dir <input_dir>`: Input directory to process (default: current directory)
-- `-o, --output-file <output_file>`: Output file path
-- `-g, --ignore-patterns <ignore_patterns>`: Patterns to ignore (in addition to those in config)
-- `-c, --config-file <config_file>`: Path to config file
-- `-v, --verbose`: Enable verbose output
-
-### Configuration File
-
-You can use a TOML configuration file to set default options. By default, the program looks for a `combiner.toml` file in the input directory. You can specify a different config file using the `-c` option.
-
-Example `combiner.toml`:
-
-```toml
-ignore_patterns = ["*.log", "*.tmp"]
-include_patterns = ["*.rs", "*.toml"]
-output_file = "combined_output.txt"
-```
+- `-d, --directory <directory>`: Input directory to process (default: current directory)
+- `-o, --output <output>`: Output file path/name
 
 ## Output
 
@@ -84,4 +66,4 @@ The program also prints a summary table showing:
 - Total number of tokens
 - Output file path
 - Processing time
-- Top files by token count
+- Top file by token count
