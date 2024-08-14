@@ -37,7 +37,7 @@ pub fn combine_files(directory: &str, output: &str) -> Result<Statistics> {
     let bpe = cl100k_base().unwrap();
     let mut stats = Statistics {
         files_processed: 0,
-        directories_visited: 0,
+        directories_visited: 1, // Start with 1 to count the root directory
         total_tokens: 0,
         max_tokens: 0,
         max_tokens_file: String::new(),
@@ -49,7 +49,7 @@ pub fn combine_files(directory: &str, output: &str) -> Result<Statistics> {
         let entry = entry.context("Failed to read directory entry")?;
         let path = entry.path();
 
-        if path.is_dir() {
+        if path.is_dir() && path != dir_path {
             stats.directories_visited += 1;
         } else if path.is_file() && path != output_path {
             stats.files_processed += 1;
@@ -87,8 +87,8 @@ pub fn print_statistics(stats: &Statistics) {
     table.add_row(row!["Files Processed", stats.files_processed]);
     table.add_row(row!["Directories Visited", stats.directories_visited]);
     table.add_row(row!["Total Tokens", stats.total_tokens]);
-    table.add_row(row!["File w/ Most Tokens", &stats.max_tokens_file]);
-    table.add_row(row!["Most Tokens in File", stats.max_tokens]);
+    table.add_row(row!["Max Tokens", stats.max_tokens]);
+    table.add_row(row!["File with Max Tokens", &stats.max_tokens_file]);
     table.add_row(row![
         "Processing Time",
         format!("{:.2?}", stats.processing_time)
@@ -133,7 +133,7 @@ mod tests {
 
         // Check statistics
         assert_eq!(stats.files_processed, 3);
-        assert_eq!(stats.directories_visited, 1);
+        assert_eq!(stats.directories_visited, 2); // Root directory + 1 subdirectory
         assert!(stats.total_tokens > 0);
         assert!(stats.processing_time > Duration::default());
         assert_eq!(stats.output_file, output_file.display().to_string());
@@ -141,3 +141,4 @@ mod tests {
         Ok(())
     }
 }
+
