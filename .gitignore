@@ -3,3 +3,4 @@ combiner_*
 combined*
 sample
 .direnv
+.envrc
