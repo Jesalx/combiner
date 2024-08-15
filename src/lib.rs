@@ -9,6 +9,24 @@ use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
 use tiktoken_rs::{cl100k_base, o200k_base, p50k_base, p50k_edit, r50k_base};
 
+/// Configuration for the file combiner
+#[derive(Debug, Clone)]
+pub struct CombinerConfig {
+    pub directory: String,
+    pub output: String,
+    pub tokenizer: String,
+}
+
+impl CombinerConfig {
+    pub fn new(directory: String, output: String, tokenizer: String) -> Self {
+        Self {
+            directory,
+            output,
+            tokenizer,
+        }
+    }
+}
+
 /// Represents the statistics collected during the file combining process.
 #[derive(Debug)]
 pub struct Statistics {
@@ -51,14 +69,14 @@ pub fn get_bpe(tokenizer: &str) -> tiktoken_rs::CoreBPE {
 /// # Returns
 ///
 /// Returns a `Result` containing the `Statistics` of the operation if successful.
-pub fn combine_files(directory: &str, output: &str, tokenizer: &str) -> Result<Statistics> {
+pub fn combine_files(config: &CombinerConfig) -> Result<Statistics> {
     let start_time = Instant::now();
 
-    let dir_path = Path::new(directory);
+    let dir_path = Path::new(&config.directory);
     let output_path = if dir_path.is_relative() {
-        PathBuf::from(".").join(output)
+        PathBuf::from(".").join(&config.output)
     } else {
-        PathBuf::from(output)
+        PathBuf::from(&config.output)
     };
 
     let output_file = Arc::new(Mutex::new(
@@ -70,7 +88,7 @@ pub fn combine_files(directory: &str, output: &str, tokenizer: &str) -> Result<S
             .context("Failed to create output file")?,
     ));
 
-    let bpe = Arc::new(get_bpe(tokenizer));
+    let bpe = Arc::new(get_bpe(&config.tokenizer));
     let stats = Arc::new(Mutex::new(Statistics {
         files_processed: 0,
         files_skipped: 0,
@@ -82,7 +100,7 @@ pub fn combine_files(directory: &str, output: &str, tokenizer: &str) -> Result<S
         output_file: output_path.display().to_string(),
     }));
 
-    Walk::new(directory).par_bridge().for_each(|entry| {
+    Walk::new(&config.directory).par_bridge().for_each(|entry| {
         let entry = match entry {
             Ok(e) => e,
             Err(err) => {
@@ -205,11 +223,12 @@ mod tests {
 
         // Combine files
         let output_file = dir_path.join("output.txt");
-        let stats = combine_files(
-            dir_path.to_str().unwrap(),
-            output_file.to_str().unwrap(),
-            tokenizer,
-        )?;
+        let config = CombinerConfig::new(
+            dir_path.to_str().unwrap().to_string(),
+            output_file.to_str().unwrap().to_string(),
+            tokenizer.to_string(),
+        );
+        let stats = combine_files(&config)?;
 
         // Read the combined output
         let combined_content = fs::read_to_string(&output_file)?;
