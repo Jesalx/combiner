@@ -7,28 +7,48 @@ use std::path::{Path, PathBuf};
 use std::time::{Duration, Instant};
 use tiktoken_rs::{cl100k_base, o200k_base, p50k_base, p50k_edit, r50k_base};
 
+/// Represents the statistics collected during the file combining process.
+#[derive(Debug)]
 pub struct Statistics {
-    files_processed: usize,
-    files_skipped: usize,
-    directories_visited: usize,
-    total_tokens: usize,
-    max_tokens: usize,
-    max_tokens_file: String,
-    processing_time: Duration,
-    output_file: String,
+    pub files_processed: usize,
+    pub files_skipped: usize,
+    pub directories_visited: usize,
+    pub total_tokens: usize,
+    pub max_tokens: usize,
+    pub max_tokens_file: String,
+    pub processing_time: Duration,
+    pub output_file: String,
 }
 
+/// Returns the appropriate BPE based on the tokenizer name.
+///
+/// # Arguments
+/// * `tokenizer` - A string slice that holds the name of the tokenizer.
+///
+/// # Returns
+/// Returns a `CoreBPE` instance for the specified tokenizer.
 pub fn get_bpe(tokenizer: &str) -> tiktoken_rs::CoreBPE {
     match tokenizer {
-        "o200k_base" => o200k_base().unwrap(),
-        "cl100k_base" => cl100k_base().unwrap(),
-        "p50k_base" => p50k_base().unwrap(),
-        "p50k_edit" => p50k_edit().unwrap(),
-        "r50k_base" => r50k_base().unwrap(),
-        _ => cl100k_base().unwrap(),
+        "o200k_base" => o200k_base().expect("Failed to load o200k_base tokenizer"),
+        "cl100k_base" => cl100k_base().expect("Failed to load cl100k_base tokenizer"),
+        "p50k_base" => p50k_base().expect("Failed to load p50k_base tokenizer"),
+        "p50k_edit" => p50k_edit().expect("Failed to load p50k_edit tokenizer"),
+        "r50k_base" => r50k_base().expect("Failed to load r50k_base tokenizer"),
+        _ => cl100k_base().expect("Failed to load default cl100k_base tokenizer"),
     }
 }
 
+/// Combines files from the specified directory into a single output file.
+///
+/// # Arguments
+///
+/// * `directory` - A string slice that holds the path to the directory to process.
+/// * `output` - A string slice that holds the path to the output file.
+/// * `tokenizer` - A string slice that specifies the tokenizer to use.
+///
+/// # Returns
+///
+/// Returns a `Result` containing the `Statistics` of the operation if successful.
 pub fn combine_files(directory: &str, output: &str, tokenizer: &str) -> Result<Statistics> {
     let start_time = Instant::now();
 
@@ -92,6 +112,17 @@ pub fn combine_files(directory: &str, output: &str, tokenizer: &str) -> Result<S
     Ok(stats)
 }
 
+/// Processes a single file, reading its contents and counting tokens.
+///
+/// # Arguments
+///
+/// * `path` - A reference to the path of the file to process.
+/// * `_output_file` - A mutable reference to the output file (unused in this function).
+/// * `bpe` - A reference to the CoreBPE tokenizer.
+///
+/// # Returns
+///
+/// Returns a `Result` containing a tuple of the token count and file content if successful.
 fn process_file(
     path: &Path,
     _output_file: &mut File,
@@ -108,6 +139,11 @@ fn process_file(
     Ok((token_count, contents))
 }
 
+/// Prints the statistics of the file combining process in a formatted table.
+///
+/// # Arguments
+///
+/// * `stats` - A reference to the `Statistics` struct containing the data to print.
 pub fn print_statistics(stats: &Statistics) {
     let mut table = Table::new();
     table.add_row(row!["Statistic", "Value"]);

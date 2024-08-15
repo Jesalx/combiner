@@ -4,12 +4,15 @@ use structopt::StructOpt;
 #[derive(Debug, StructOpt)]
 #[structopt(name = "combiner", about = "Combines files in a directory")]
 struct Opt {
+    /// Input directory to process
     #[structopt(short, long, default_value = ".")]
     directory: String,
 
+    /// Output file path/name
     #[structopt(short, long, default_value = "combined_output.txt")]
     output: String,
 
+    /// Tokenizer to use
     #[structopt(
         short,
         long,
