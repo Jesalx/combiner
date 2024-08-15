@@ -1,9 +1,11 @@
 use anyhow::{Context, Result};
 use ignore::Walk;
 use prettytable::{row, Table};
+use rayon::prelude::*;
 use std::fs::{File, OpenOptions};
 use std::io::{Read, Write};
 use std::path::{Path, PathBuf};
+use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
 use tiktoken_rs::{cl100k_base, o200k_base, p50k_base, p50k_edit, r50k_base};
 
@@ -59,15 +61,17 @@ pub fn combine_files(directory: &str, output: &str, tokenizer: &str) -> Result<S
         PathBuf::from(output)
     };
 
-    let mut output_file = OpenOptions::new()
-        .write(true)
-        .create(true)
-        .truncate(true)
-        .open(&output_path)
-        .context("Failed to create output file")?;
+    let output_file = Arc::new(Mutex::new(
+        OpenOptions::new()
+            .write(true)
+            .create(true)
+            .truncate(true)
+            .open(&output_path)
+            .context("Failed to create output file")?,
+    ));
 
-    let bpe = get_bpe(tokenizer);
-    let mut stats = Statistics {
+    let bpe = Arc::new(get_bpe(tokenizer));
+    let stats = Arc::new(Mutex::new(Statistics {
         files_processed: 0,
         files_skipped: 0,
         directories_visited: 1, // Start with 1 to count the root directory
@@ -76,39 +80,55 @@ pub fn combine_files(directory: &str, output: &str, tokenizer: &str) -> Result<S
         max_tokens_file: String::new(),
         processing_time: Duration::default(),
         output_file: output_path.display().to_string(),
-    };
+    }));
 
-    for entry in Walk::new(directory) {
-        let entry = entry.context("Failed to read directory entry")?;
+    Walk::new(directory).par_bridge().for_each(|entry| {
+        let entry = match entry {
+            Ok(e) => e,
+            Err(err) => {
+                eprintln!("Error reading directory entry: {}", err);
+                return;
+            }
+        };
         let path = entry.path();
 
         if path.is_dir() && path != dir_path {
+            let mut stats = stats.lock().unwrap();
             stats.directories_visited += 1;
         } else if path.is_file() && path != output_path {
-            match process_file(path, &mut output_file, &bpe) {
+            match process_file(path, &bpe) {
                 Ok((token_count, file_content)) => {
+                    let mut stats = stats.lock().unwrap();
                     stats.total_tokens += token_count;
                     if token_count > stats.max_tokens {
                         stats.max_tokens = token_count;
                         stats.max_tokens_file = path.display().to_string();
                     }
-
-                    writeln!(output_file, "--- File: {} ---", path.display())
-                        .context("Failed to write file name to output")?;
-                    write!(output_file, "{}", file_content)
-                        .context("Failed to write file contents to output")?;
-                    writeln!(output_file).context("Failed to write newline to output")?;
                     stats.files_processed += 1;
+
+                    let mut output = output_file.lock().unwrap();
+                    if writeln!(output, "--- File: {} ---", path.display()).is_err()
+                        || write!(output, "{}", file_content).is_err()
+                        || writeln!(output).is_err()
+                    {
+                        eprintln!("Failed to write to output file");
+                    }
                 }
                 Err(e) => {
                     eprintln!("Skipped file {}: {}", path.display(), e);
+                    let mut stats = stats.lock().unwrap();
                     stats.files_skipped += 1;
                 }
             }
         }
-    }
+    });
 
+    let mut stats = Arc::try_unwrap(stats)
+        .expect("Failed to unwrap Arc")
+        .into_inner()
+        .expect("Failed to unwrap Mutex");
     stats.processing_time = start_time.elapsed();
+
     Ok(stats)
 }
 
@@ -117,17 +137,12 @@ pub fn combine_files(directory: &str, output: &str, tokenizer: &str) -> Result<S
 /// # Arguments
 ///
 /// * `path` - A reference to the path of the file to process.
-/// * `_output_file` - A mutable reference to the output file (unused in this function).
 /// * `bpe` - A reference to the CoreBPE tokenizer.
 ///
 /// # Returns
 ///
 /// Returns a `Result` containing a tuple of the token count and file content if successful.
-fn process_file(
-    path: &Path,
-    _output_file: &mut File,
-    bpe: &tiktoken_rs::CoreBPE,
-) -> Result<(usize, String)> {
+fn process_file(path: &Path, bpe: &Arc<tiktoken_rs::CoreBPE>) -> Result<(usize, String)> {
     let mut file = File::open(path).context("Failed to open input file")?;
     let mut contents = String::new();
     file.read_to_string(&mut contents)

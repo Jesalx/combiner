@@ -6,6 +6,7 @@ Combiner is a Rust-based command-line tool that processes text files in a given 
 
 - Recursively scans directories for text files
 - Token counting using the tiktoken-rs library
+- Rayon-based parallel processing for faster processing
 - Detailed output statistics
 
 ## Installation
