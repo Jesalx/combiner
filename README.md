@@ -42,7 +42,7 @@ cargo install combiner
 Basic usage:
 
 ```
-combiner -d <directory> -o <output>
+combiner -d <directory> -o <output> -t <tokenizer>
 ```
 
 For more options:
@@ -55,6 +55,7 @@ combiner --help
 
 - `-d, --directory <directory>`: Input directory to process (default: current directory)
 - `-o, --output <output>`: Output file path/name
+- `-t, --tokenizer <tokenizer>`: Tokenizer to use (default: p50k_base)
 
 ## Output
 

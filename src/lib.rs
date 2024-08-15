@@ -5,7 +5,7 @@ use std::fs::{File, OpenOptions};
 use std::io::{Read, Write};
 use std::path::{Path, PathBuf};
 use std::time::{Duration, Instant};
-use tiktoken_rs::cl100k_base;
+use tiktoken_rs::{cl100k_base, o200k_base, p50k_base, p50k_edit, r50k_base};
 
 pub struct Statistics {
     files_processed: usize,
@@ -17,7 +17,18 @@ pub struct Statistics {
     output_file: String,
 }
 
-pub fn combine_files(directory: &str, output: &str) -> Result<Statistics> {
+pub fn get_bpe(tokenizer: &str) -> tiktoken_rs::CoreBPE {
+    match tokenizer {
+        "o200k_base" => o200k_base().unwrap(),
+        "cl100k_base" => cl100k_base().unwrap(),
+        "p50k_base" => p50k_base().unwrap(),
+        "p50k_edit" => p50k_edit().unwrap(),
+        "r50k_base" => r50k_base().unwrap(),
+        _ => cl100k_base().unwrap(),
+    }
+}
+
+pub fn combine_files(directory: &str, output: &str, tokenizer: &str) -> Result<Statistics> {
     let start_time = Instant::now();
 
     let dir_path = Path::new(directory);
@@ -34,7 +45,7 @@ pub fn combine_files(directory: &str, output: &str) -> Result<Statistics> {
         .open(&output_path)
         .context("Failed to create output file")?;
 
-    let bpe = cl100k_base().unwrap();
+    let bpe = get_bpe(tokenizer);
     let mut stats = Statistics {
         files_processed: 0,
         directories_visited: 1, // Start with 1 to count the root directory
@@ -106,6 +117,7 @@ mod tests {
     fn test_combine_files() -> Result<()> {
         let temp_dir = TempDir::new()?;
         let dir_path = temp_dir.path();
+        let tokenizer = "cl100k_base";
 
         // Create test files
         fs::write(dir_path.join("file1.txt"), "Content of file 1")?;
@@ -120,7 +132,11 @@ mod tests {
 
         // Combine files
         let output_file = dir_path.join("output.txt");
-        let stats = combine_files(dir_path.to_str().unwrap(), output_file.to_str().unwrap())?;
+        let stats = combine_files(
+            dir_path.to_str().unwrap(),
+            output_file.to_str().unwrap(),
+            tokenizer,
+        )?;
 
         // Read the combined output
         let combined_content = fs::read_to_string(&output_file)?;
@@ -141,4 +157,3 @@ mod tests {
         Ok(())
     }
 }
-
