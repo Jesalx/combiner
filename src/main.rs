@@ -1,4 +1,4 @@
-use combiner::{combine_files, print_statistics, CombinerConfig};
+use combiner::{combine_files, CombinerConfig};
 use structopt::StructOpt;
 
 #[derive(Debug, StructOpt)]
@@ -26,6 +26,6 @@ fn main() -> anyhow::Result<()> {
     let opt = Opt::from_args();
     let config = CombinerConfig::new(opt.directory, opt.output, opt.tokenizer);
     let stats = combine_files(&config)?;
-    print_statistics(&stats);
+    stats.print();
     Ok(())
 }

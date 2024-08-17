@@ -8,7 +8,7 @@ use std::fs::{File, OpenOptions};
 use std::io::{Read, Write};
 use std::path::{Path, PathBuf};
 use std::sync::{Arc, Mutex};
-use std::time::{Duration, Instant};
+use std::time::Instant;
 
 /// Combines files from the specified directory into a single output file.
 ///
@@ -39,16 +39,9 @@ pub fn combine_files(config: &CombinerConfig) -> Result<Statistics> {
     ));
 
     let bpe = Arc::new(get_bpe(&config.tokenizer));
-    let stats = Arc::new(Mutex::new(Statistics {
-        files_processed: 0,
-        files_skipped: 0,
-        directories_visited: 1, // Start with 1 to count the root directory
-        total_tokens: 0,
-        max_tokens: 0,
-        max_tokens_file: String::new(),
-        processing_time: Duration::default(),
-        output_file: output_path.display().to_string(),
-    }));
+    let stats = Arc::new(Mutex::new(Statistics::new(
+        output_path.display().to_string(),
+    )));
 
     Walk::new(&config.directory).par_bridge().for_each(|entry| {
         let entry = match entry {
@@ -62,7 +55,7 @@ pub fn combine_files(config: &CombinerConfig) -> Result<Statistics> {
 
         if path.is_dir() && path != dir_path {
             let mut stats = stats.lock().unwrap();
-            stats.directories_visited += 1;
+            stats.increment_directories_visited()
         } else if path.is_file() && path != output_path {
             match process_file(path, &bpe) {
                 Ok((token_count, file_content)) => {
@@ -72,7 +65,8 @@ pub fn combine_files(config: &CombinerConfig) -> Result<Statistics> {
                         stats.max_tokens = token_count;
                         stats.max_tokens_file = path.display().to_string();
                     }
-                    stats.files_processed += 1;
+                    stats.increment_processed_files();
+                    stats.update_token_stats(token_count, path.display().to_string());
 
                     let mut output = output_file.lock().unwrap();
                     if writeln!(output, "--- File: {} ---", path.display()).is_err()
@@ -126,6 +120,7 @@ fn process_file(path: &Path, bpe: &Arc<tiktoken_rs::CoreBPE>) -> Result<(usize, 
 mod tests {
     use super::*;
     use std::fs;
+    use std::time::Duration;
     use tempfile::TempDir;
 
     #[test]
