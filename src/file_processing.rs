@@ -132,7 +132,7 @@ mod tests {
     fn test_combine_files() -> Result<()> {
         let temp_dir = TempDir::new()?;
         let dir_path = temp_dir.path();
-        let tokenizer = "cl100k_base";
+        let tokenizer = "p50k_base";
 
         // Create test files
         fs::write(dir_path.join("file1.txt"), "Content of file 1")?;
@@ -171,7 +171,7 @@ mod tests {
         assert_eq!(stats.files_processed, 3);
         assert_eq!(stats.files_skipped, 1);
         assert_eq!(stats.directories_visited, 2); // Root directory + 1 subdirectory
-        assert!(stats.total_tokens > 0);
+        assert!(stats.total_tokens == 12); // Total tokens in above 3 strings is 12 for p50k_base
         assert!(stats.processing_time > Duration::default());
         assert_eq!(stats.output_file, output_file.display().to_string());
 
