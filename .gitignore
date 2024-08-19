@@ -1,4 +1,4 @@
-/target
+target/
 combiner_*
 combined*
 sample
