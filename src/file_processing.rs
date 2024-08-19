@@ -10,6 +10,13 @@ use std::path::{Path, PathBuf};
 use std::sync::{Arc, Mutex};
 use std::time::Instant;
 
+/// Struct to processing results of a file
+#[derive(Debug)]
+struct FileResult {
+    path: PathBuf,
+    content: String,
+}
+
 /// Combines files from the specified directory into a single output file.
 ///
 /// # Arguments
@@ -29,61 +36,59 @@ pub fn combine_files(config: &CombinerConfig) -> Result<Statistics> {
         PathBuf::from(&config.output)
     };
 
-    let output_file = Arc::new(Mutex::new(
-        OpenOptions::new()
-            .write(true)
-            .create(true)
-            .truncate(true)
-            .open(&output_path)
-            .context("Failed to create output file")?,
-    ));
-
     let bpe = Arc::new(get_bpe(&config.tokenizer));
     let stats = Arc::new(Mutex::new(Statistics::new(
         output_path.display().to_string(),
     )));
 
-    Walk::new(&config.directory).par_bridge().for_each(|entry| {
-        let entry = match entry {
-            Ok(e) => e,
-            Err(err) => {
-                eprintln!("Error reading directory entry: {}", err);
-                return;
-            }
-        };
-        let path = entry.path();
+    // Collect results in a vector
+    let results: Vec<FileResult> = Walk::new(&config.directory)
+        .par_bridge()
+        .filter_map(|entry| {
+            let entry = entry.ok()?;
+            let path = entry.path();
 
-        if path.is_dir() && path != dir_path {
-            let mut stats = stats.lock().unwrap();
-            stats.increment_directories_visited()
-        } else if path.is_file() && path != output_path {
-            match process_file(path, &bpe) {
-                Ok((token_count, file_content)) => {
-                    let mut stats = stats.lock().unwrap();
-                    stats.total_tokens += token_count;
-                    if token_count > stats.max_tokens {
-                        stats.max_tokens = token_count;
-                        stats.max_tokens_file = path.display().to_string();
+            if path.is_dir() && path != dir_path {
+                let mut stats = stats.lock().unwrap();
+                stats.increment_directories_visited();
+                None
+            } else if path.is_file() && path != output_path {
+                match process_file(path, &bpe) {
+                    Ok((token_count, content)) => {
+                        let mut stats = stats.lock().unwrap();
+                        stats.increment_processed_files();
+                        stats.update_token_stats(token_count, path.display().to_string());
+                        Some(FileResult {
+                            path: path.to_path_buf(),
+                            content,
+                        })
                     }
-                    stats.increment_processed_files();
-                    stats.update_token_stats(token_count, path.display().to_string());
-
-                    let mut output = output_file.lock().unwrap();
-                    if writeln!(output, "--- File: {} ---", path.display()).is_err()
-                        || write!(output, "{}", file_content).is_err()
-                        || writeln!(output).is_err()
-                    {
-                        eprintln!("Failed to write to output file");
+                    Err(e) => {
+                        eprintln!("Skipped file {}: {}", path.display(), e);
+                        let mut stats = stats.lock().unwrap();
+                        stats.increment_skipped_files();
+                        None
                     }
                 }
-                Err(e) => {
-                    eprintln!("Skipped file {}: {}", path.display(), e);
-                    let mut stats = stats.lock().unwrap();
-                    stats.files_skipped += 1;
-                }
+            } else {
+                None
             }
-        }
-    });
+        })
+        .collect();
+
+    // Write results to the output file
+    let mut output_file = OpenOptions::new()
+        .write(true)
+        .create(true)
+        .truncate(true)
+        .open(&output_path)
+        .context("Failed to create output file")?;
+
+    for result in results {
+        writeln!(output_file, "--- File: {} ---", result.path.display())?;
+        write!(output_file, "{}", result.content)?;
+        writeln!(output_file)?;
+    }
 
     let mut stats = Arc::try_unwrap(stats)
         .expect("Failed to unwrap Arc")
