@@ -1,6 +1,7 @@
 package traversal
 
 import (
+	"combiner/internal/config"
 	"combiner/internal/ignore"
 	"combiner/internal/statistics"
 	"fmt"
@@ -10,7 +11,7 @@ import (
 	"unicode/utf8"
 )
 
-func CollectFiles(directory string, ignoreService *ignore.IgnoreService, stats *statistics.Statistics) []statistics.File {
+func CollectFiles(directory string, cfg *config.Config, ignoreService *ignore.IgnoreService, stats *statistics.Statistics) []statistics.File {
 	output := []statistics.File{}
 
 	filepath.WalkDir(directory, func(path string, d fs.DirEntry, err error) error {
@@ -27,12 +28,16 @@ func CollectFiles(directory string, ignoreService *ignore.IgnoreService, stats *
 
 		contents, err := os.ReadFile(path)
 		if err != nil {
-			fmt.Printf("Error reading file: %v\n", err)
+			if cfg.Verbose {
+				fmt.Printf("Error reading file: %v\n", err)
+			}
 			return nil
 		}
 
 		if !utf8.Valid(contents) {
-			fmt.Printf("Skipping File: %s is not valid UTF-8\n", path)
+			if cfg.Verbose {
+				fmt.Printf("Skipping File: %s is not valid UTF-8\n", path)
+			}
 			stats.IncrementSkippedFiles()
 			return nil // Return nil so that traversal continues
 		}
@@ -43,7 +48,9 @@ func CollectFiles(directory string, ignoreService *ignore.IgnoreService, stats *
 			Contents: contents,
 		})
 		// fmt.Printf("File contents: %s\n", string(contents))
-		fmt.Printf("File %s\n", path)
+		if cfg.Verbose {
+			fmt.Printf("File %s\n", path)
+		}
 		stats.IncrementProcessedFiles()
 		return nil
 	})

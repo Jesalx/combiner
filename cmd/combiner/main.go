@@ -1,6 +1,7 @@
 package main
 
 import (
+	"combiner/internal/config"
 	"combiner/internal/ignore"
 	"combiner/internal/statistics"
 	"combiner/internal/tokenization"
@@ -17,18 +18,20 @@ func main() {
 	var ignorePatterns []string
 	var tokenizer string
 	var includeHidden bool
+	var verbose bool
 
 	rootCmd := &cobra.Command{
 		Use:   "combiner",
 		Short: "Description of combiner",
 		Run: func(cmd *cobra.Command, args []string) {
 			stats := statistics.New(outputFile)
+			cfg := config.New(verbose)
 			ignorePatterns = append(ignorePatterns, outputFile) // Ignore the output file itself
 			if !includeHidden {
 				ignorePatterns = append(ignorePatterns, ".*") // Ignore hidden files
 			}
 			ignoreService := ignore.New(ignorePatterns)
-			files := traversal.CollectFiles(directory, ignoreService, stats)
+			files := traversal.CollectFiles(directory, cfg, ignoreService, stats)
 			tokenizer := tokenization.New(tokenizer)
 			tokenizer.ProcessFiles(stats, files)
 			stats.Print()
@@ -40,6 +43,7 @@ func main() {
 	rootCmd.Flags().StringVarP(&tokenizer, "tokenizer", "t", "p50k_base", "tokenizer to use")
 	rootCmd.Flags().StringSliceVarP(&ignorePatterns, "ignore", "i", nil, "files/directories to ignore")
 	rootCmd.Flags().BoolVar(&includeHidden, "include-hidden", false, "include hidden files and directories")
+	rootCmd.Flags().BoolVar(&verbose, "verbose", false, "print verbose output")
 
 	if err := rootCmd.Execute(); err != nil {
 		fmt.Println(err)
